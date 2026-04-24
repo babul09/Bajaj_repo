@@ -2,8 +2,10 @@ package com.bajaj.quizvalidator.application;
 
 import com.bajaj.quizvalidator.config.ValidatorProperties;
 import com.bajaj.quizvalidator.domain.scoring.ScoringEngine;
+import com.bajaj.quizvalidator.domain.scoring.LeaderboardEntry;
 import com.bajaj.quizvalidator.integration.ValidatorClient;
 import com.bajaj.quizvalidator.integration.dto.PollResponse;
+import com.bajaj.quizvalidator.integration.dto.SubmitResponse;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -18,11 +20,23 @@ class RunOrchestratorSequenceTest {
     void executesExactTenPollIndicesInOrder() {
         List<Integer> observedPollIndices = new ArrayList<>();
 
-        ValidatorClient validatorClient = (regNo, pollIndex) -> {
-            observedPollIndices.add(pollIndex);
-            PollResponse pollResponse = new PollResponse();
-            pollResponse.setEvents(List.of());
-            return pollResponse;
+        ValidatorClient validatorClient = new ValidatorClient() {
+            @Override
+            public PollResponse fetchMessages(String regNo, int pollIndex) {
+                observedPollIndices.add(pollIndex);
+                PollResponse pollResponse = new PollResponse();
+                pollResponse.setEvents(List.of());
+                return pollResponse;
+            }
+
+            @Override
+            public SubmitResponse submitLeaderboard(String regNo, List<LeaderboardEntry> leaderboard) {
+                SubmitResponse submitResponse = new SubmitResponse();
+                submitResponse.setRegNo(regNo);
+                submitResponse.setSubmittedTotal(leaderboard.stream().mapToInt(LeaderboardEntry::totalScore).sum());
+                submitResponse.setAttemptCount(1);
+                return submitResponse;
+            }
         };
 
         ValidatorProperties properties = new ValidatorProperties();

@@ -23,6 +23,16 @@ public class RunStatusResponse {
     private final String scoringSummary;
     private final List<ParticipantTotal> participantTotals;
     private final List<LeaderboardEntry> leaderboard;
+    private final Boolean submissionAttempted;
+    private final Boolean duplicateSubmissionBlocked;
+    private final Integer totalPollsMade;
+    private final Integer submittedTotal;
+    private final Integer expectedTotal;
+    private final Integer submitAttemptCount;
+    private final Boolean isCorrect;
+    private final Boolean isIdempotent;
+    private final String submitMessage;
+    private final String runSummary;
 
     public RunStatusResponse(
             String runId,
@@ -40,7 +50,17 @@ public class RunStatusResponse {
             Integer combinedTotalScore,
             String scoringSummary,
             List<ParticipantTotal> participantTotals,
-            List<LeaderboardEntry> leaderboard
+            List<LeaderboardEntry> leaderboard,
+            Boolean submissionAttempted,
+            Boolean duplicateSubmissionBlocked,
+            Integer totalPollsMade,
+            Integer submittedTotal,
+            Integer expectedTotal,
+            Integer submitAttemptCount,
+            Boolean isCorrect,
+            Boolean isIdempotent,
+            String submitMessage,
+            String runSummary
     ) {
         this.runId = runId;
         this.state = state;
@@ -58,6 +78,16 @@ public class RunStatusResponse {
         this.scoringSummary = scoringSummary;
         this.participantTotals = participantTotals == null ? null : List.copyOf(participantTotals);
         this.leaderboard = leaderboard == null ? null : List.copyOf(leaderboard);
+        this.submissionAttempted = submissionAttempted;
+        this.duplicateSubmissionBlocked = duplicateSubmissionBlocked;
+        this.totalPollsMade = totalPollsMade;
+        this.submittedTotal = submittedTotal;
+        this.expectedTotal = expectedTotal;
+        this.submitAttemptCount = submitAttemptCount;
+        this.isCorrect = isCorrect;
+        this.isIdempotent = isIdempotent;
+        this.submitMessage = submitMessage;
+        this.runSummary = runSummary;
     }
 
     public String getRunId() {
@@ -122,5 +152,45 @@ public class RunStatusResponse {
 
     public List<LeaderboardEntry> getLeaderboard() {
         return leaderboard;
+    }
+
+    public Boolean getSubmissionAttempted() {
+        return submissionAttempted;
+    }
+
+    public Boolean getDuplicateSubmissionBlocked() {
+        return duplicateSubmissionBlocked;
+    }
+
+    public Integer getTotalPollsMade() {
+        return totalPollsMade;
+    }
+
+    public Integer getSubmittedTotal() {
+        return submittedTotal;
+    }
+
+    public Integer getExpectedTotal() {
+        return expectedTotal;
+    }
+
+    public Integer getSubmitAttemptCount() {
+        return submitAttemptCount;
+    }
+
+    public Boolean getIsCorrect() {
+        return isCorrect;
+    }
+
+    public Boolean getIsIdempotent() {
+        return isIdempotent;
+    }
+
+    public String getSubmitMessage() {
+        return submitMessage;
+    }
+
+    public String getRunSummary() {
+        return runSummary;
     }
 }

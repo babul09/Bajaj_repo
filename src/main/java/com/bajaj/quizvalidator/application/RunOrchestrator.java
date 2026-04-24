@@ -6,6 +6,7 @@ import com.bajaj.quizvalidator.domain.scoring.ScoringEngine;
 import com.bajaj.quizvalidator.domain.scoring.ScoringResult;
 import com.bajaj.quizvalidator.integration.ValidatorClient;
 import com.bajaj.quizvalidator.integration.dto.PollResponse;
+import com.bajaj.quizvalidator.integration.dto.SubmitResponse;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,7 +97,17 @@ public class RunOrchestrator {
                 current.scoringSnapshot == null ? null : current.scoringSnapshot.getCombinedTotalScore(),
                 current.scoringSnapshot == null ? null : current.scoringSnapshot.getReviewSummary(),
                 current.scoringSnapshot == null ? null : current.scoringSnapshot.getParticipantTotals(),
-                current.scoringSnapshot == null ? null : current.scoringSnapshot.getLeaderboard()
+                current.scoringSnapshot == null ? null : current.scoringSnapshot.getLeaderboard(),
+                current.submissionSnapshot == null ? null : current.submissionSnapshot.isSubmissionAttempted(),
+                current.submissionSnapshot == null ? null : current.submissionSnapshot.isDuplicateSubmissionBlocked(),
+                current.submissionSnapshot == null ? null : current.submissionSnapshot.getTotalPollsMade(),
+                current.submissionSnapshot == null ? null : current.submissionSnapshot.getSubmittedTotal(),
+                current.submissionSnapshot == null ? null : current.submissionSnapshot.getExpectedTotal(),
+                current.submissionSnapshot == null ? null : current.submissionSnapshot.getAttemptCount(),
+                current.submissionSnapshot == null ? null : current.submissionSnapshot.getCorrect(),
+                current.submissionSnapshot == null ? null : current.submissionSnapshot.getIdempotent(),
+                current.submissionSnapshot == null ? null : current.submissionSnapshot.getMessage(),
+                buildRunSummary(current.scoringSnapshot, current.submissionSnapshot)
         );
     }
 
@@ -153,12 +164,18 @@ public class RunOrchestrator {
 
             ScoringResult scoringResult = scoringEngine.score(collectedPollResponses);
             RunScoringSnapshot scoringSnapshot = RunScoringSnapshot.from(scoringResult);
+            RunSubmissionSnapshot submissionSnapshot = submitLeaderboard(runId, regNo, scoringSnapshot);
             LOGGER.info(
                     "run_id={} scoring_summary={}",
                     runId,
                     scoringSnapshot.getReviewSummary()
             );
-            status = status.complete(scoringSnapshot);
+            LOGGER.info(
+                    "run_id={} submit_summary={}",
+                    runId,
+                    submissionSnapshot.getReviewSummary()
+            );
+            status = status.complete(scoringSnapshot, submissionSnapshot);
             LOGGER.info("run_id={} outcome=completed", runId);
         } catch (Exception exception) {
             status = status.fail(exception.getMessage());
@@ -170,6 +187,39 @@ public class RunOrchestrator {
 
     private String formatInstant(Instant instant) {
         return instant == null ? null : DateTimeFormatter.ISO_INSTANT.format(instant);
+    }
+
+    private RunSubmissionSnapshot submitLeaderboard(String runId, String regNo, RunScoringSnapshot scoringSnapshot) {
+        RunSubmissionGuard submissionGuard = new RunSubmissionGuard();
+        RunSubmissionGuard.SubmissionAttempt submissionAttempt = submissionGuard.submitOnce(
+                () -> validatorClient.submitLeaderboard(regNo, scoringSnapshot.getLeaderboard())
+        );
+
+        if (!submissionAttempt.executed()) {
+            throw new IllegalStateException("Submission was blocked before the first validator call for run " + runId);
+        }
+
+        RunSubmissionGuard.SubmissionAttempt duplicateAttempt = submissionGuard.submitOnce(() -> {
+            throw new IllegalStateException("Duplicate submission supplier should not be invoked");
+        });
+
+        if (duplicateAttempt.duplicateBlocked()) {
+            LOGGER.info("run_id={} outcome=duplicate_submission_blocked", runId);
+        }
+
+        SubmitResponse submitResponse = submissionAttempt.submitResponse();
+        return RunSubmissionSnapshot.from(submitResponse, duplicateAttempt.duplicateBlocked());
+    }
+
+    private String buildRunSummary(RunScoringSnapshot scoringSnapshot, RunSubmissionSnapshot submissionSnapshot) {
+        if (scoringSnapshot == null) {
+            return null;
+        }
+        String scoringSummary = scoringSnapshot.getReviewSummary();
+        if (submissionSnapshot == null) {
+            return scoringSummary;
+        }
+        return scoringSummary + ", " + submissionSnapshot.getReviewSummary();
     }
 
     public record StartResult(boolean accepted, String runId, String reason) {
@@ -193,6 +243,7 @@ public class RunOrchestrator {
         private final Instant startedAt;
         private final Instant finishedAt;
         private final RunScoringSnapshot scoringSnapshot;
+        private final RunSubmissionSnapshot submissionSnapshot;
 
         private RunStatus(
                 String runId,
@@ -203,7 +254,8 @@ public class RunOrchestrator {
                 String lastError,
                 Instant startedAt,
                 Instant finishedAt,
-                RunScoringSnapshot scoringSnapshot
+                RunScoringSnapshot scoringSnapshot,
+                RunSubmissionSnapshot submissionSnapshot
         ) {
             this.runId = runId;
             this.state = state;
@@ -214,30 +266,31 @@ public class RunOrchestrator {
             this.startedAt = startedAt;
             this.finishedAt = finishedAt;
             this.scoringSnapshot = scoringSnapshot;
+            this.submissionSnapshot = submissionSnapshot;
         }
 
         static RunStatus idle() {
-            return new RunStatus(null, "idle", null, null, 0, null, null, null, null);
+            return new RunStatus(null, "idle", null, null, 0, null, null, null, null, null);
         }
 
         static RunStatus running(String runId) {
-            return new RunStatus(runId, "running", 0, 1, 0, null, Instant.now(), null, null);
+            return new RunStatus(runId, "running", 0, 1, 0, null, Instant.now(), null, null, null);
         }
 
         RunStatus withProgress(int pollIndex, int attempt) {
-            return new RunStatus(runId, state, pollIndex, attempt, retryCount, lastError, startedAt, finishedAt, scoringSnapshot);
+            return new RunStatus(runId, state, pollIndex, attempt, retryCount, lastError, startedAt, finishedAt, scoringSnapshot, submissionSnapshot);
         }
 
         RunStatus incrementRetryCount() {
-            return new RunStatus(runId, state, currentPollIndex, currentAttempt, retryCount + 1, lastError, startedAt, finishedAt, scoringSnapshot);
+            return new RunStatus(runId, state, currentPollIndex, currentAttempt, retryCount + 1, lastError, startedAt, finishedAt, scoringSnapshot, submissionSnapshot);
         }
 
         RunStatus fail(String error) {
-            return new RunStatus(runId, "failed", currentPollIndex, currentAttempt, retryCount, error, startedAt, Instant.now(), scoringSnapshot);
+            return new RunStatus(runId, "failed", currentPollIndex, currentAttempt, retryCount, error, startedAt, Instant.now(), scoringSnapshot, submissionSnapshot);
         }
 
-        RunStatus complete(RunScoringSnapshot scoringSnapshot) {
-            return new RunStatus(runId, "completed", currentPollIndex, currentAttempt, retryCount, null, startedAt, Instant.now(), scoringSnapshot);
+        RunStatus complete(RunScoringSnapshot scoringSnapshot, RunSubmissionSnapshot submissionSnapshot) {
+            return new RunStatus(runId, "completed", currentPollIndex, currentAttempt, retryCount, null, startedAt, Instant.now(), scoringSnapshot, submissionSnapshot);
         }
     }
 }

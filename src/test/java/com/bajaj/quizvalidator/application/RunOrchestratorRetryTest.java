@@ -3,8 +3,10 @@ package com.bajaj.quizvalidator.application;
 import com.bajaj.quizvalidator.api.dto.RunStatusResponse;
 import com.bajaj.quizvalidator.config.ValidatorProperties;
 import com.bajaj.quizvalidator.domain.scoring.ScoringEngine;
+import com.bajaj.quizvalidator.domain.scoring.LeaderboardEntry;
 import com.bajaj.quizvalidator.integration.ValidatorClient;
 import com.bajaj.quizvalidator.integration.dto.PollResponse;
+import com.bajaj.quizvalidator.integration.dto.SubmitResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.ResourceAccessException;
 
@@ -19,16 +21,28 @@ class RunOrchestratorRetryTest {
     void retriesTransientFailuresWithinBoundedAttempts() {
         AtomicInteger attemptsForFirstPoll = new AtomicInteger();
 
-        ValidatorClient validatorClient = (regNo, pollIndex) -> {
-            if (pollIndex == 0) {
-                int currentAttempt = attemptsForFirstPoll.incrementAndGet();
-                if (currentAttempt < 3) {
-                    throw new ResourceAccessException("temporary timeout");
+        ValidatorClient validatorClient = new ValidatorClient() {
+            @Override
+            public PollResponse fetchMessages(String regNo, int pollIndex) {
+                if (pollIndex == 0) {
+                    int currentAttempt = attemptsForFirstPoll.incrementAndGet();
+                    if (currentAttempt < 3) {
+                        throw new ResourceAccessException("temporary timeout");
+                    }
                 }
+                PollResponse pollResponse = new PollResponse();
+                pollResponse.setEvents(java.util.List.of());
+                return pollResponse;
             }
-            PollResponse pollResponse = new PollResponse();
-            pollResponse.setEvents(java.util.List.of());
-            return pollResponse;
+
+            @Override
+            public SubmitResponse submitLeaderboard(String regNo, java.util.List<LeaderboardEntry> leaderboard) {
+                SubmitResponse submitResponse = new SubmitResponse();
+                submitResponse.setRegNo(regNo);
+                submitResponse.setSubmittedTotal(leaderboard.stream().mapToInt(LeaderboardEntry::totalScore).sum());
+                submitResponse.setAttemptCount(1);
+                return submitResponse;
+            }
         };
 
         ValidatorProperties properties = new ValidatorProperties();

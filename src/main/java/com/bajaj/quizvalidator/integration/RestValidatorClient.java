@@ -1,12 +1,17 @@
 package com.bajaj.quizvalidator.integration;
 
 import com.bajaj.quizvalidator.config.ValidatorProperties;
+import com.bajaj.quizvalidator.domain.scoring.LeaderboardEntry;
 import com.bajaj.quizvalidator.integration.dto.PollResponse;
+import com.bajaj.quizvalidator.integration.dto.SubmitRequest;
+import com.bajaj.quizvalidator.integration.dto.SubmitResponse;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.stereotype.Component;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
+
+import java.util.List;
 
 @Component
 public class RestValidatorClient implements ValidatorClient {
@@ -36,5 +41,15 @@ public class RestValidatorClient implements ValidatorClient {
                 .toUriString();
 
         return restTemplate.getForObject(url, PollResponse.class);
+    }
+
+    @Override
+    public SubmitResponse submitLeaderboard(String regNo, List<LeaderboardEntry> leaderboard) {
+        String url = UriComponentsBuilder
+                .fromHttpUrl(validatorProperties.getBaseUrl())
+                .pathSegment("quiz", "submit")
+                .toUriString();
+
+        return restTemplate.postForObject(url, new SubmitRequest(regNo, leaderboard), SubmitResponse.class);
     }
 }

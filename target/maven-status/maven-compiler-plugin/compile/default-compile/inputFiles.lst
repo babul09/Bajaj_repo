@@ -7,6 +7,8 @@
 /home/kelvin/Documents/bajaj/src/main/java/com/bajaj/quizvalidator/application/RetryPolicy.java
 /home/kelvin/Documents/bajaj/src/main/java/com/bajaj/quizvalidator/application/RunOrchestrator.java
 /home/kelvin/Documents/bajaj/src/main/java/com/bajaj/quizvalidator/application/RunScoringSnapshot.java
+/home/kelvin/Documents/bajaj/src/main/java/com/bajaj/quizvalidator/application/RunSubmissionGuard.java
+/home/kelvin/Documents/bajaj/src/main/java/com/bajaj/quizvalidator/application/RunSubmissionSnapshot.java
 /home/kelvin/Documents/bajaj/src/main/java/com/bajaj/quizvalidator/config/AsyncConfig.java
 /home/kelvin/Documents/bajaj/src/main/java/com/bajaj/quizvalidator/config/ValidatorProperties.java
 /home/kelvin/Documents/bajaj/src/main/java/com/bajaj/quizvalidator/domain/scoring/LeaderboardEntry.java
@@ -18,3 +20,5 @@
 /home/kelvin/Documents/bajaj/src/main/java/com/bajaj/quizvalidator/integration/ValidatorClient.java
 /home/kelvin/Documents/bajaj/src/main/java/com/bajaj/quizvalidator/integration/dto/PollRequest.java
 /home/kelvin/Documents/bajaj/src/main/java/com/bajaj/quizvalidator/integration/dto/PollResponse.java
+/home/kelvin/Documents/bajaj/src/main/java/com/bajaj/quizvalidator/integration/dto/SubmitRequest.java
+/home/kelvin/Documents/bajaj/src/main/java/com/bajaj/quizvalidator/integration/dto/SubmitResponse.java

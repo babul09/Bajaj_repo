@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Validator Leaderboard</title>
+    <style>
+        :root {
+            --bg: #f6f2e8;
+            --panel: #fffdf8;
+            --ink: #1f2933;
+            --muted: #52606d;
+            --accent: #b45309;
+            --accent-soft: #f7d9a8;
+            --line: #e8dcc8;
+            --success: #2f855a;
+            --danger: #c53030;
+            --shadow: 0 18px 45px rgba(66, 44, 14, 0.10);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, #fff6dd, transparent 30%),
+                radial-gradient(circle at top right, #fde7c0, transparent 25%),
+                linear-gradient(180deg, #f4efe4 0%, #f8f5ee 100%);
+        }
+
+        .page {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 32px 20px 48px;
+        }
+
+        .hero {
+            padding: 28px;
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            background: linear-gradient(135deg, #fff8ea 0%, #fffdf8 100%);
+            box-shadow: var(--shadow);
+        }
+
+        .eyebrow {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: #8a4b08;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            margin: 14px 0 10px;
+            font-size: clamp(2rem, 4vw, 3.3rem);
+            line-height: 1.05;
+        }
+
+        .hero p {
+            margin: 0;
+            max-width: 760px;
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 18px;
+            margin-top: 22px;
+        }
+
+        .card {
+            grid-column: span 12;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .card h2 {
+            margin: 0 0 16px;
+            font-size: 1.1rem;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: end;
+        }
+
+        .field {
+            flex: 1 1 240px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.92rem;
+            font-weight: 600;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid #d8ccb8;
+            background: #fff;
+            font: inherit;
+        }
+
+        button {
+            border: 0;
+            border-radius: 12px;
+            padding: 12px 16px;
+            background: var(--accent);
+            color: #fff;
+            font: inherit;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        button.secondary {
+            background: #334e68;
+        }
+
+        button:disabled {
+            opacity: 0.65;
+            cursor: wait;
+        }
+
+        .status-banner {
+            margin-top: 14px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: #fff7e5;
+            color: #8a4b08;
+            font-weight: 600;
+        }
+
+        .status-banner.error {
+            background: #fff0f0;
+            color: var(--danger);
+        }
+
+        .status-banner.success {
+            background: #ecfff4;
+            color: var(--success);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .stat {
+            padding: 14px;
+            border-radius: 16px;
+            border: 1px solid var(--line);
+            background: linear-gradient(180deg, #fffdfa 0%, #fbf7ee 100%);
+        }
+
+        .stat .label {
+            display: block;
+            color: var(--muted);
+            font-size: 0.82rem;
+            margin-bottom: 6px;
+        }
+
+        .stat .value {
+            display: block;
+            font-size: 1.5rem;
+            font-weight: 800;
+        }
+
+        .split {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 18px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 12px 10px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        th {
+            font-size: 0.85rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #f6ead4;
+            color: #8a4b08;
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-transform: capitalize;
+        }
+
+        .detail-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .detail {
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: #fbf7ef;
+            border: 1px solid var(--line);
+        }
+
+        .detail strong {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--muted);
+        }
+
+        .summary {
+            margin: 0;
+            padding: 14px;
+            border-radius: 16px;
+            background: #fffaf0;
+            border: 1px solid var(--line);
+            color: var(--muted);
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .empty {
+            color: var(--muted);
+            padding: 20px 0 6px;
+        }
+
+        @media (max-width: 900px) {
+            .stats,
+            .split {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .page {
+                padding: 18px 14px 32px;
+            }
+
+            .hero,
+            .card {
+                padding: 16px;
+                border-radius: 18px;
+            }
+
+            .stats {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            th,
+            td {
+                padding: 10px 6px;
+                font-size: 0.92rem;
+            }
+        }
+    </style>
+</head>
+<body>
+<main class="page">
+    <section class="hero">
+        <span class="eyebrow">Quiz Validator</span>
+        <h1>Run, watch, and review the leaderboard</h1>
+        <p>
+            This page starts a validator run, refreshes live status from the backend, and shows the
+            deduplicated leaderboard plus audit details from the final submission.
+        </p>
+    </section>
+
+    <section class="grid">
+        <div class="card">
+            <h2>Run Controls</h2>
+            <div class="controls">
+                <div class="field">
+                    <label for="regNo">Registration Number</label>
+                    <input id="regNo" name="regNo" value="2024CS101" placeholder="2024CS101">
+                </div>
+                <button id="startRunButton" type="button">Start Run</button>
+                <button id="refreshButton" class="secondary" type="button">Refresh Status</button>
+            </div>
+            <div id="statusBanner" class="status-banner">Waiting for run status.</div>
+        </div>
+
+        <div class="card">
+            <h2>Live Snapshot</h2>
+            <div class="stats">
+                <div class="stat">
+                    <span class="label">State</span>
+                    <span class="value" id="stateValue">idle</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Current Poll</span>
+                    <span class="value" id="pollValue">-</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Retries</span>
+                    <span class="value" id="retryValue">0</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Submitted Total</span>
+                    <span class="value" id="submittedTotalValue">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="grid-column: span 8;">
+            <h2>Leaderboard</h2>
+            <div id="leaderboardEmpty" class="empty">No leaderboard yet. Start a run and wait for completion.</div>
+            <table id="leaderboardTable" hidden>
+                <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Participant</th>
+                    <th>Total Score</th>
+                </tr>
+                </thead>
+                <tbody id="leaderboardBody"></tbody>
+            </table>
+        </div>
+
+        <div class="card" style="grid-column: span 4;">
+            <h2>Run Details</h2>
+            <div class="detail-list">
+                <div class="detail"><strong>Run ID</strong><span id="runIdValue">-</span></div>
+                <div class="detail"><strong>Started At</strong><span id="startedAtValue">-</span></div>
+                <div class="detail"><strong>Finished At</strong><span id="finishedAtValue">-</span></div>
+                <div class="detail"><strong>Submission</strong><span id="submissionValue">-</span></div>
+                <div class="detail"><strong>Validator Message</strong><span id="messageValue">-</span></div>
+                <div class="detail"><strong>Last Error</strong><span id="errorValue">-</span></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Scoring Audit</h2>
+            <div class="stats">
+                <div class="stat">
+                    <span class="label">Unique Events</span>
+                    <span class="value" id="uniqueEventsValue">-</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Duplicates Dropped</span>
+                    <span class="value" id="duplicateEventsValue">-</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Participants</span>
+                    <span class="value" id="participantsValue">-</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Expected Total</span>
+                    <span class="value" id="expectedTotalValue">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Run Summary</h2>
+            <p id="runSummaryValue" class="summary">Summary will appear here after the backend processes a run.</p>
+        </div>
+    </section>
+</main>
+
+<script>
+    const startRunButton = document.getElementById("startRunButton");
+    const refreshButton = document.getElementById("refreshButton");
+    const regNoInput = document.getElementById("regNo");
+    const statusBanner = document.getElementById("statusBanner");
+
+    let pollTimer = null;
+
+    function setBanner(message, tone) {
+        statusBanner.textContent = message;
+        statusBanner.className = "status-banner" + (tone ? " " + tone : "");
+    }
+
+    function formatValue(value) {
+        return value === null || value === undefined || value === "" ? "-" : String(value);
+    }
+
+    function renderStatus(status) {
+        document.getElementById("stateValue").textContent = formatValue(status.state);
+        document.getElementById("pollValue").textContent = status.currentPollIndex ?? "-";
+        document.getElementById("retryValue").textContent = status.retryCount ?? 0;
+        document.getElementById("submittedTotalValue").textContent = status.submittedTotal ?? "-";
+        document.getElementById("runIdValue").textContent = formatValue(status.runId);
+        document.getElementById("startedAtValue").textContent = formatValue(status.startedAt);
+        document.getElementById("finishedAtValue").textContent = formatValue(status.finishedAt);
+        document.getElementById("messageValue").textContent = formatValue(status.submitMessage);
+        document.getElementById("errorValue").textContent = formatValue(status.lastError);
+        document.getElementById("uniqueEventsValue").textContent = status.uniqueEventCount ?? "-";
+        document.getElementById("duplicateEventsValue").textContent = status.duplicateEventCount ?? "-";
+        document.getElementById("participantsValue").textContent = status.participantCount ?? "-";
+        document.getElementById("expectedTotalValue").textContent = status.expectedTotal ?? "-";
+        document.getElementById("runSummaryValue").textContent = status.runSummary || "Summary will appear here after the backend processes a run.";
+
+        const submissionBits = [
+            status.submissionAttempted ? "submitted" : "not submitted",
+            status.duplicateSubmissionBlocked ? "duplicate blocked" : null,
+            status.isCorrect === true ? "correct" : status.isCorrect === false ? "incorrect" : null,
+            status.isIdempotent === true ? "idempotent" : status.isIdempotent === false ? "not idempotent" : null
+        ].filter(Boolean);
+        document.getElementById("submissionValue").textContent = submissionBits.length ? submissionBits.join(", ") : "-";
+
+        const leaderboard = Array.isArray(status.leaderboard) ? status.leaderboard : [];
+        const leaderboardBody = document.getElementById("leaderboardBody");
+        const leaderboardTable = document.getElementById("leaderboardTable");
+        const leaderboardEmpty = document.getElementById("leaderboardEmpty");
+
+        leaderboardBody.innerHTML = "";
+        if (!leaderboard.length) {
+            leaderboardTable.hidden = true;
+            leaderboardEmpty.hidden = false;
+        } else {
+            leaderboardEmpty.hidden = true;
+            leaderboardTable.hidden = false;
+            leaderboard.forEach((entry, index) => {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td><span class="pill">#${index + 1}</span></td>
+                    <td>${entry.participant}</td>
+                    <td>${entry.totalScore}</td>
+                `;
+                leaderboardBody.appendChild(row);
+            });
+        }
+
+        if (status.state === "running") {
+            setBanner("Run in progress. Polling continues every 5 seconds.", "");
+            scheduleRefresh();
+        } else if (status.state === "completed") {
+            setBanner("Run completed. Leaderboard and submission details are ready.", "success");
+            clearScheduledRefresh();
+        } else if (status.state === "failed") {
+            setBanner("Run failed. Review the last error and retry when ready.", "error");
+            clearScheduledRefresh();
+        } else {
+            setBanner("Waiting for run status.", "");
+            clearScheduledRefresh();
+        }
+    }
+
+    function clearScheduledRefresh() {
+        if (pollTimer) {
+            window.clearTimeout(pollTimer);
+            pollTimer = null;
+        }
+    }
+
+    function scheduleRefresh() {
+        clearScheduledRefresh();
+        pollTimer = window.setTimeout(loadStatus, 3000);
+    }
+
+    async function loadStatus() {
+        try {
+            const response = await fetch("/api/runs/status");
+            if (!response.ok) {
+                throw new Error("Status request failed with HTTP " + response.status);
+            }
+            const status = await response.json();
+            renderStatus(status);
+        } catch (error) {
+            setBanner(error.message, "error");
+        }
+    }
+
+    async function startRun() {
+        const regNo = regNoInput.value.trim();
+        if (!regNo) {
+            setBanner("Please enter a registration number before starting a run.", "error");
+            return;
+        }
+
+        startRunButton.disabled = true;
+        setBanner("Starting run...", "");
+
+        try {
+            const response = await fetch("/api/runs", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ regNo })
+            });
+
+            const payload = await response.json();
+            if (!response.ok) {
+                throw new Error(payload.message || "Failed to start run");
+            }
+
+            setBanner("Run started. Fetching live status...", "");
+            await loadStatus();
+        } catch (error) {
+            setBanner(error.message, "error");
+        } finally {
+            startRunButton.disabled = false;
+        }
+    }
+
+    startRunButton.addEventListener("click", startRun);
+    refreshButton.addEventListener("click", loadStatus);
+    loadStatus();
+</script>
+</body>
+</html>

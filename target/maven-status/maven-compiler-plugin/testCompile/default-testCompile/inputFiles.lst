@@ -2,4 +2,5 @@
 /home/kelvin/Documents/bajaj/src/test/java/com/bajaj/quizvalidator/application/RunOrchestratorScoringTest.java
 /home/kelvin/Documents/bajaj/src/test/java/com/bajaj/quizvalidator/application/RunOrchestratorSequenceTest.java
 /home/kelvin/Documents/bajaj/src/test/java/com/bajaj/quizvalidator/application/RunOrchestratorTimingTest.java
+/home/kelvin/Documents/bajaj/src/test/java/com/bajaj/quizvalidator/application/RunSubmissionGuardTest.java
 /home/kelvin/Documents/bajaj/src/test/java/com/bajaj/quizvalidator/domain/scoring/ScoringEngineTest.java

@@ -8,12 +8,14 @@ import com.bajaj.quizvalidator.domain.scoring.ScoringEngine;
 import com.bajaj.quizvalidator.domain.scoring.ScoringResult;
 import com.bajaj.quizvalidator.integration.ValidatorClient;
 import com.bajaj.quizvalidator.integration.dto.PollResponse;
+import com.bajaj.quizvalidator.integration.dto.SubmitResponse;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -24,26 +26,45 @@ class RunOrchestratorScoringTest {
     void scoresCollectedPollEventsAfterPollingCompletes() {
         List<PollResponse> pollResponses = new ArrayList<>();
         AtomicBoolean sawFinalPollBeforeScoring = new AtomicBoolean(false);
+        AtomicInteger submitCalls = new AtomicInteger();
 
-        ValidatorClient validatorClient = (regNo, pollIndex) -> {
-            PollResponse pollResponse = new PollResponse();
-            pollResponse.setPollIndex(pollIndex);
-            switch (pollIndex) {
-                case 0 -> pollResponse.setEvents(List.of(
-                        event("round-1", "alice", 10),
-                        event("round-2", "bob", 7)
-                ));
-                case 1 -> pollResponse.setEvents(List.of(
-                        event("round-1", "alice", 10),
-                        event("round-3", "alice", 5)
-                ));
-                default -> pollResponse.setEvents(List.of());
+        ValidatorClient validatorClient = new ValidatorClient() {
+            @Override
+            public PollResponse fetchMessages(String regNo, int pollIndex) {
+                PollResponse pollResponse = new PollResponse();
+                pollResponse.setPollIndex(pollIndex);
+                switch (pollIndex) {
+                    case 0 -> pollResponse.setEvents(List.of(
+                            event("round-1", "alice", 10),
+                            event("round-2", "bob", 7)
+                    ));
+                    case 1 -> pollResponse.setEvents(List.of(
+                            event("round-1", "alice", 10),
+                            event("round-3", "alice", 5)
+                    ));
+                    default -> pollResponse.setEvents(List.of());
+                }
+                pollResponses.add(pollResponse);
+                if (pollIndex == 9) {
+                    sawFinalPollBeforeScoring.set(true);
+                }
+                return pollResponse;
             }
-            pollResponses.add(pollResponse);
-            if (pollIndex == 9) {
-                sawFinalPollBeforeScoring.set(true);
+
+            @Override
+            public SubmitResponse submitLeaderboard(String regNo, List<LeaderboardEntry> leaderboard) {
+                submitCalls.incrementAndGet();
+                SubmitResponse submitResponse = new SubmitResponse();
+                submitResponse.setRegNo(regNo);
+                submitResponse.setTotalPollsMade(10);
+                submitResponse.setSubmittedTotal(leaderboard.stream().mapToInt(LeaderboardEntry::totalScore).sum());
+                submitResponse.setExpectedTotal(leaderboard.stream().mapToInt(LeaderboardEntry::totalScore).sum());
+                submitResponse.setAttemptCount(1);
+                submitResponse.setIsCorrect(Boolean.TRUE);
+                submitResponse.setIsIdempotent(Boolean.TRUE);
+                submitResponse.setMessage("accepted");
+                return submitResponse;
             }
-            return pollResponse;
         };
 
         TrackingScoringEngine scoringEngine = new TrackingScoringEngine(sawFinalPollBeforeScoring);
@@ -75,11 +96,23 @@ class RunOrchestratorScoringTest {
         assertEquals(expected.leaderboard().size(), status.getLeaderboardSize());
         assertEquals(expected.participantTotals(), status.getParticipantTotals());
         assertEquals(expected.leaderboard(), status.getLeaderboard());
+        assertEquals(Boolean.TRUE, status.getSubmissionAttempted());
+        assertEquals(Boolean.TRUE, status.getDuplicateSubmissionBlocked());
+        assertEquals(10, status.getTotalPollsMade());
+        assertEquals(expected.combinedTotalScore(), status.getSubmittedTotal());
+        assertEquals(expected.combinedTotalScore(), status.getExpectedTotal());
+        assertEquals(1, status.getSubmitAttemptCount());
+        assertEquals(Boolean.TRUE, status.getIsCorrect());
+        assertEquals(Boolean.TRUE, status.getIsIdempotent());
+        assertEquals("accepted", status.getSubmitMessage());
         assertTrue(status.getScoringSummary().contains("uniqueEvents=3"));
         assertTrue(status.getScoringSummary().contains("duplicates=1"));
         assertTrue(status.getScoringSummary().contains("participants=2"));
         assertTrue(status.getScoringSummary().contains("leaderboard=[alice=15, bob=7]"));
+        assertTrue(status.getRunSummary().contains("submittedTotal=22"));
+        assertTrue(status.getRunSummary().contains("duplicateSubmissionBlocked=true"));
         assertEquals(1, scoringEngine.invocations);
+        assertEquals(1, submitCalls.get());
         assertEquals(List.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), pollResponses.stream().map(PollResponse::getPollIndex).toList());
         assertEquals(10, scoringEngine.scoredPollCount);
         assertTrue(scoringEngine.scoredAfterFinalPoll);
