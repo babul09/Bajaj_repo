@@ -1,0 +1,13 @@
+server:
+  port: 8080
+
+validator:
+  base-url: https://devapigw.vidalhealthtpa.com/srm-quiz-task
+  connect-timeout-ms: 5000
+  read-timeout-ms: 10000
+  min-poll-interval-ms: 5000
+  retry-max-attempts: 3
+
+logging:
+  level:
+    com.bajaj.quizvalidator: INFO
