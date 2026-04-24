@@ -2,6 +2,7 @@ package com.bajaj.quizvalidator.application;
 
 import com.bajaj.quizvalidator.api.dto.RunStatusResponse;
 import com.bajaj.quizvalidator.config.ValidatorProperties;
+import com.bajaj.quizvalidator.domain.scoring.ScoringEngine;
 import com.bajaj.quizvalidator.integration.ValidatorClient;
 import com.bajaj.quizvalidator.integration.dto.PollResponse;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,9 @@ class RunOrchestratorRetryTest {
                     throw new ResourceAccessException("temporary timeout");
                 }
             }
-            return new PollResponse();
+            PollResponse pollResponse = new PollResponse();
+            pollResponse.setEvents(java.util.List.of());
+            return pollResponse;
         };
 
         ValidatorProperties properties = new ValidatorProperties();
@@ -35,7 +38,12 @@ class RunOrchestratorRetryTest {
         properties.setConnectTimeoutMs(1000);
         properties.setReadTimeoutMs(1000);
 
-        RunOrchestrator runOrchestrator = new RunOrchestrator(validatorClient, properties, Executors.newSingleThreadExecutor());
+        RunOrchestrator runOrchestrator = new RunOrchestrator(
+            validatorClient,
+            properties,
+            new ScoringEngine(),
+            Executors.newSingleThreadExecutor()
+        );
         runOrchestrator.initializePolicies();
 
         runOrchestrator.executeRunBlockingForTest("retry-run", "2024CS101");

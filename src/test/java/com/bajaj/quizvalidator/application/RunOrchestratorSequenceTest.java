@@ -1,6 +1,7 @@
 package com.bajaj.quizvalidator.application;
 
 import com.bajaj.quizvalidator.config.ValidatorProperties;
+import com.bajaj.quizvalidator.domain.scoring.ScoringEngine;
 import com.bajaj.quizvalidator.integration.ValidatorClient;
 import com.bajaj.quizvalidator.integration.dto.PollResponse;
 import org.junit.jupiter.api.Test;
@@ -19,7 +20,9 @@ class RunOrchestratorSequenceTest {
 
         ValidatorClient validatorClient = (regNo, pollIndex) -> {
             observedPollIndices.add(pollIndex);
-            return new PollResponse();
+            PollResponse pollResponse = new PollResponse();
+            pollResponse.setEvents(List.of());
+            return pollResponse;
         };
 
         ValidatorProperties properties = new ValidatorProperties();
@@ -29,7 +32,12 @@ class RunOrchestratorSequenceTest {
         properties.setConnectTimeoutMs(1000);
         properties.setReadTimeoutMs(1000);
 
-        RunOrchestrator runOrchestrator = new RunOrchestrator(validatorClient, properties, Executors.newSingleThreadExecutor());
+        RunOrchestrator runOrchestrator = new RunOrchestrator(
+            validatorClient,
+            properties,
+            new ScoringEngine(),
+            Executors.newSingleThreadExecutor()
+        );
         runOrchestrator.initializePolicies();
 
         runOrchestrator.executeRunBlockingForTest("test-run", "2024CS101");

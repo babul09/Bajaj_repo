@@ -2,7 +2,10 @@ package com.bajaj.quizvalidator.application;
 
 import com.bajaj.quizvalidator.api.dto.RunStatusResponse;
 import com.bajaj.quizvalidator.config.ValidatorProperties;
+import com.bajaj.quizvalidator.domain.scoring.ScoringEngine;
+import com.bajaj.quizvalidator.domain.scoring.ScoringResult;
 import com.bajaj.quizvalidator.integration.ValidatorClient;
+import com.bajaj.quizvalidator.integration.dto.PollResponse;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +15,8 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -23,6 +28,7 @@ public class RunOrchestrator {
 
     private final ValidatorClient validatorClient;
     private final ValidatorProperties validatorProperties;
+    private final ScoringEngine scoringEngine;
     private final Executor runExecutor;
 
     private PollDelayEnforcer pollDelayEnforcer;
@@ -34,10 +40,12 @@ public class RunOrchestrator {
     public RunOrchestrator(
             ValidatorClient validatorClient,
             ValidatorProperties validatorProperties,
+            ScoringEngine scoringEngine,
             @Qualifier("runExecutor") Executor runExecutor
     ) {
         this.validatorClient = validatorClient;
         this.validatorProperties = validatorProperties;
+        this.scoringEngine = scoringEngine;
         this.runExecutor = runExecutor;
     }
 
@@ -80,12 +88,21 @@ public class RunOrchestrator {
                 current.retryCount,
                 current.lastError,
                 formatInstant(current.startedAt),
-                formatInstant(current.finishedAt)
+                formatInstant(current.finishedAt),
+                current.scoringSnapshot == null ? null : current.scoringSnapshot.getUniqueEventCount(),
+                current.scoringSnapshot == null ? null : current.scoringSnapshot.getDuplicateEventCount(),
+                current.scoringSnapshot == null ? null : current.scoringSnapshot.getParticipantCount(),
+                current.scoringSnapshot == null ? null : current.scoringSnapshot.getLeaderboardSize(),
+                current.scoringSnapshot == null ? null : current.scoringSnapshot.getCombinedTotalScore(),
+                current.scoringSnapshot == null ? null : current.scoringSnapshot.getReviewSummary(),
+                current.scoringSnapshot == null ? null : current.scoringSnapshot.getParticipantTotals(),
+                current.scoringSnapshot == null ? null : current.scoringSnapshot.getLeaderboard()
         );
     }
 
     private void executeRun(String runId, String regNo) {
         Instant previousRequestStart = null;
+        List<PollResponse> collectedPollResponses = new ArrayList<>();
         try {
             for (int pollIndex = 0; pollIndex <= 9; pollIndex++) {
                 boolean completedPoll = false;
@@ -100,7 +117,11 @@ public class RunOrchestrator {
                     LOGGER.info("poll_index={} attempt={} outcome=started", pollIndex, attempt);
 
                     try {
-                        validatorClient.fetchMessages(regNo, pollIndex);
+                        PollResponse pollResponse = validatorClient.fetchMessages(regNo, pollIndex);
+                        if (pollResponse == null) {
+                            throw new IllegalStateException("Validator returned no poll response for poll index " + pollIndex);
+                        }
+                        collectedPollResponses.add(pollResponse);
                         LOGGER.info("poll_index={} attempt={} outcome=success", pollIndex, attempt);
                         completedPoll = true;
                     } catch (Exception exception) {
@@ -130,7 +151,14 @@ public class RunOrchestrator {
                 }
             }
 
-            status = status.complete();
+            ScoringResult scoringResult = scoringEngine.score(collectedPollResponses);
+            RunScoringSnapshot scoringSnapshot = RunScoringSnapshot.from(scoringResult);
+            LOGGER.info(
+                    "run_id={} scoring_summary={}",
+                    runId,
+                    scoringSnapshot.getReviewSummary()
+            );
+            status = status.complete(scoringSnapshot);
             LOGGER.info("run_id={} outcome=completed", runId);
         } catch (Exception exception) {
             status = status.fail(exception.getMessage());
@@ -164,6 +192,7 @@ public class RunOrchestrator {
         private final String lastError;
         private final Instant startedAt;
         private final Instant finishedAt;
+        private final RunScoringSnapshot scoringSnapshot;
 
         private RunStatus(
                 String runId,
@@ -173,7 +202,8 @@ public class RunOrchestrator {
                 int retryCount,
                 String lastError,
                 Instant startedAt,
-                Instant finishedAt
+                Instant finishedAt,
+                RunScoringSnapshot scoringSnapshot
         ) {
             this.runId = runId;
             this.state = state;
@@ -183,30 +213,31 @@ public class RunOrchestrator {
             this.lastError = lastError;
             this.startedAt = startedAt;
             this.finishedAt = finishedAt;
+            this.scoringSnapshot = scoringSnapshot;
         }
 
         static RunStatus idle() {
-            return new RunStatus(null, "idle", null, null, 0, null, null, null);
+            return new RunStatus(null, "idle", null, null, 0, null, null, null, null);
         }
 
         static RunStatus running(String runId) {
-            return new RunStatus(runId, "running", 0, 1, 0, null, Instant.now(), null);
+            return new RunStatus(runId, "running", 0, 1, 0, null, Instant.now(), null, null);
         }
 
         RunStatus withProgress(int pollIndex, int attempt) {
-            return new RunStatus(runId, state, pollIndex, attempt, retryCount, lastError, startedAt, finishedAt);
+            return new RunStatus(runId, state, pollIndex, attempt, retryCount, lastError, startedAt, finishedAt, scoringSnapshot);
         }
 
         RunStatus incrementRetryCount() {
-            return new RunStatus(runId, state, currentPollIndex, currentAttempt, retryCount + 1, lastError, startedAt, finishedAt);
+            return new RunStatus(runId, state, currentPollIndex, currentAttempt, retryCount + 1, lastError, startedAt, finishedAt, scoringSnapshot);
         }
 
         RunStatus fail(String error) {
-            return new RunStatus(runId, "failed", currentPollIndex, currentAttempt, retryCount, error, startedAt, Instant.now());
+            return new RunStatus(runId, "failed", currentPollIndex, currentAttempt, retryCount, error, startedAt, Instant.now(), scoringSnapshot);
         }
 
-        RunStatus complete() {
-            return new RunStatus(runId, "completed", currentPollIndex, currentAttempt, retryCount, null, startedAt, Instant.now());
+        RunStatus complete(RunScoringSnapshot scoringSnapshot) {
+            return new RunStatus(runId, "completed", currentPollIndex, currentAttempt, retryCount, null, startedAt, Instant.now(), scoringSnapshot);
         }
     }
 }
